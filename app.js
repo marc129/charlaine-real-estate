@@ -8,8 +8,9 @@ let muted=localStorage.getItem('chMute')==='1',speaking=false,audio=new Audio(),
 const mb=$('#mute');const setM=()=>mb.textContent=muted?'Voice off':'Voice on';setM();
 mb.onclick=()=>{muted=!muted;localStorage.setItem('chMute',muted?'1':'0');setM();if(muted){audio.pause();speaking=false}};
 addEventListener('pointerdown',()=>{if(unlocked)return;unlocked=true;audio.src='audio/silence.mp3';audio.play().catch(()=>{})},{once:true});
-function say(id){if(muted||!id)return Promise.resolve();return new Promise(r=>{try{if(rec&&listening)rec.abort()}catch(e){}speaking=true;audio.pause();audio.src='audio/'+id+'.mp3';
-const done=()=>{setTimeout(()=>{speaking=false},400);r()};audio.onended=done;audio.onerror=done;audio.play().catch(done)})}
+function say(id){if(muted||!id)return Promise.resolve();return new Promise(r=>{speaking=true;audio.pause();audio.src='audio/'+id+'.mp3';document.dispatchEvent(new CustomEvent('ch:speak',{detail:true}));
+const done=()=>{audio.onended=audio.onerror=null;setTimeout(()=>{speaking=false;document.dispatchEvent(new CustomEvent('ch:speak',{detail:false}));r()},350)};audio.onended=done;audio.onerror=done;audio.play().catch(done)})}
+function stopSay(){audio.pause();if(speaking){speaking=false;document.dispatchEvent(new CustomEvent('ch:speak',{detail:false}))}}
 // ---------- intent parsing ----------
 const AREA={jc:/jersey city|bergen|lafayette|downtown|journal square|heights|greenville|paulus|west side/,hoboken:/hoboken/,weehawken:/weehawken/,edgewater:/edgewater/,unioncity:/union city/,northbergen:/north bergen/,wny:/west new york|wny/};
 const AREA_AUD={jc:'area_jc',hoboken:'area_hoboken',weehawken:'area_weehawken',edgewater:'area_edgewater',unioncity:'area_unioncity',northbergen:'area_northbergen',wny:'area_wny'};
@@ -64,15 +65,8 @@ setTimeout(()=>document.querySelector(r.go||'#answer').scrollIntoView({behavior:
 $('#vform').onsubmit=e=>{e.preventDefault();const v=$('#q').value.trim();if(v)show(v)};
 document.addEventListener('click',e=>{const b=e.target.closest('[data-q]');if(b&&!b.closest('#chat')){const t=b.dataset.q;if(/showing/i.test(t)){$('#alead').scrollIntoView({behavior:'smooth'});say('tour');return}if(/pre-qual/i.test(t))return show('pre-qualify');$('#q').value=t;show(t)}
 const tb=e.target.closest('[data-tour]');if(tb){$('#q').value='Tour '+tb.dataset.tour;$('#answer').hidden=false;$('#aq').textContent=tb.dataset.tour;$('#atext').textContent=TXT.tour;$('#acards').innerHTML='';$('#achips').innerHTML='';leadForm('Showing request: '+tb.dataset.tour,$('#alead'));say('tour');$('#answer').scrollIntoView({behavior:'smooth'})}});
-// ---------- voice input ----------
-const SR=window.SpeechRecognition||window.webkitSpeechRecognition;let rec=null,listening=false;const vs=$('#vstate'),mic=$('#mic');
-if(SR){rec=new SR();rec.lang='en-US';rec.interimResults=true;rec.continuous=false;
-rec.onstart=()=>{listening=true;mic.classList.add('on');vs.textContent='Listening…'};
-rec.onend=()=>{listening=false;mic.classList.remove('on');vs.textContent='Speak or type. Ask about homes, neighborhoods, or what your home is worth.'};
-rec.onresult=e=>{if(speaking||!audio.paused)return;let t='';for(const r of e.results)t+=r[0].transcript;$('#q').value=t;if(e.results[e.results.length-1].isFinal)show(t)};
-rec.onerror=()=>{}}
-mic.onclick=()=>{if(!rec){vs.textContent='Voice search needs Chrome, Edge or Safari. You can type your search instead.';return}
-if(listening){rec.stop();return}audio.pause();speaking=false;setTimeout(()=>{try{rec.start()}catch(e){}},120)};
+// ---------- voice input: handled by the orb ----------
+$('#mic').onclick=()=>window.Orb&&window.Orb.open(true);
 // ---------- estimate ----------
 $('#est').onsubmit=e=>{e.preventDefault();const f=new FormData(e.target),sf=+f.get('sqft'),a=(f.get('addr')||'').toLowerCase();
 const h=H.find(x=>a.includes(x.n.toLowerCase()))||H[0],k=+f.get('type');const lo=sf*h.ppsf[0]*k,hi=sf*h.ppsf[1]*k,rd=v=>Math.round(v/5000)*5000;
@@ -80,16 +74,5 @@ const o=$('#eout');o.hidden=false;o.innerHTML=`<span>Indicative range · ${h.n}<
 $('#lock').style.display='none';e.target.querySelector('.btn').style.display='none';say('estimate_ready');lead('Home estimate request',f)};
 // ---------- contact ----------
 $('#cform').onsubmit=e=>{e.preventDefault();lead('Contact form',new FormData(e.target));e.target.querySelector('.cdone').hidden=false;say('lead_thanks')};
-// ---------- chat ----------
-const chat=$('#chat'),chb=$('#chb');let greeted=false;
-function bm(h,c='b'){const d=document.createElement('div');d.className='m '+c;d.innerHTML=h;chb.appendChild(d);chb.scrollTop=1e6;return d}
-$('#chatbtn').onclick=()=>{chat.hidden=!chat.hidden;if(!chat.hidden&&!greeted){greeted=true;bm(TXT.hi);chips(['Homes in Jersey City','What is my home worth?','First-time buyer','Contact Charlaine'])}if(!chat.hidden)$('#chi').focus()};
-$('#chx').onclick=()=>chat.hidden=true;
-function chips(a){const d=document.createElement('div');d.className='chips';d.innerHTML=a.map(c=>`<button type="button">${c}</button>`).join('');d.onclick=e=>{const b=e.target.closest('button');if(b)ask(b.textContent)};chb.appendChild(d);chb.scrollTop=1e6}
-function ask(t){bm(t.replace(/</g,'&lt;'),'u');const r=reply(t);setTimeout(()=>{let h=r.text;if(r.cards.length)h+='<br><br>'+r.cards.map(l=>`<b>${l.addr}</b> · ${l.bd} bd / ${l.ba} ba · ${l.price?fmt(l.price):'price on request'}`).join('<br>');bm(h);
-if(r.go==='#sell')bm('<a href="#sell" onclick="document.getElementById(\'chat\').hidden=true">Open the private home estimate →</a>');
-if(r.lead||r.go==='#sell'){const d=bm('<form><input name="name" placeholder="Name" required><input name="email" type="email" placeholder="Email" required><input name="phone" placeholder="Phone (optional)"><button class="btn">Have Charlaine contact me</button></form>');
-d.querySelector('form').onsubmit=e=>{e.preventDefault();lead('Chat: '+(r.lead||t),new FormData(e.target));d.innerHTML='Thank you! Charlaine will be in touch soon.'}}
-if(r.chips.length)chips(r.chips.filter(c=>!/showing/i.test(c)))},350)}
-$('#chf').onsubmit=e=>{e.preventDefault();const v=$('#chi').value.trim();if(v){$('#chi').value='';ask(v)}};
+window.CH={reply,parse,show,lead,say,stopSay,card,fmt,TXT,audio,isMuted:()=>muted,L,H};
 })();
