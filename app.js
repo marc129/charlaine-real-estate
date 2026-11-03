@@ -2,7 +2,7 @@
 const nav=$('#nav');addEventListener('scroll',()=>nav.classList.toggle('solid',scrollY>60),{passive:true});
 $('#burger').onclick=()=>$('#mnav').classList.toggle('open');document.querySelectorAll('#mnav a').forEach(a=>a.onclick=()=>$('#mnav').classList.remove('open'));
 // hero video: portrait on mobile
-const hv=$('#hv'),port=matchMedia('(max-aspect-ratio:3/4)').matches;hv.poster=port?'media/hero-p.jpg':'media/hero.jpg';hv.src=port?'media/hero-p.mp4':'media/hero.mp4';
+
 // ---------- voice output ----------
 let muted=localStorage.getItem('chMute')==='1',speaking=false,audio=new Audio(),unlocked=false;
 const mb=$('#mute');const setM=()=>mb.textContent=muted?'Voice off':'Voice on';setM();
@@ -37,9 +37,7 @@ return q}
 const L=window.LISTINGS,H=window.HOODS;
 function card(l){const p=l.price?fmt(l.price):'Price on request';const spec=l.bd?`<p class="sp">${l.bd} bed · ${l.ba} bath${l.sf?' · '+l.sf.toLocaleString()+' sq ft':''}</p>`:'';
 return `<article class="card ${l.kind}"><p class="tg">${l.tag}</p><h3>${l.addr}</h3><p class="ar">${l.hood?l.hood+', ':''}${l.area}, NJ</p>${spec}<p class="pr">${l.kind==='sold'?'Sold · ':''}${p}</p><p class="st">${l.status}</p>${l.kind==='listing'?`<button data-tour="${l.addr}">Request a private showing</button>`:''}</article>`}
-$('#listings').innerHTML=L.map(card).join('');
-$('#hoods').innerHTML=H.map(h=>`<button data-q="homes in ${h.n}"><b>${h.n}</b><span>${h.d}</span></button>`).join('');
-$('#quotes').innerHTML=window.QUOTES.map(q=>`<figure><blockquote>“${q[0]}”</blockquote><figcaption>${q[1]}</figcaption></figure>`).join('');
+$('#quotes').innerHTML=window.QUOTES.map((q,i)=>`<figure class="qt" data-i="${i}"><blockquote>“${q[0]}”</blockquote><figcaption>${q[1]}</figcaption></figure>`).join('');
 function leadForm(ctx,el){el.innerHTML=`<form class="lf"><p class="lk" style="font:italic 400 22px var(--serif);color:var(--gold)">Have Charlaine follow up</p><input name="name" placeholder="Name" required><input name="email" type="email" placeholder="Email" required><input name="phone" type="tel" placeholder="Phone (optional)"><button class="btn">Send to Charlaine</button></form>`;
 el.querySelector('form').onsubmit=e=>{e.preventDefault();lead(ctx,new FormData(e.target));el.innerHTML='<p class="atext">Thank you. Charlaine will be in touch very soon.</p>';say('lead_thanks')}}
 function lead(ctx,fd){const o=Object.fromEntries(fd);o.ctx=ctx;o.t=new Date().toISOString();const a=JSON.parse(localStorage.getItem('chLeads')||'[]');a.push(o);localStorage.setItem('chLeads',JSON.stringify(a));
